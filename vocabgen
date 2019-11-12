@@ -7,17 +7,19 @@ from jisho import jisho_get
 from models import vocab_model
 from rtk import rtk
 from tqdm import tqdm
+from wordfreq import wordfreq
 
 tags = ["#common", "#words"]
 jlpt_min = -1
 jlpt_max = -1
 deck_name = None
 translate_grammar = True
+sort_by_freq = True
 
-opts, args = getopt(sys.argv[1:], "RTGr:t:j:h")
+opts, args = getopt(sys.argv[1:], "RTGr:t:j:n:h")
 
 help_text = f"""
-Usage: {sys.argv[0]} [-RTGh] [-n <name>] [-t <tags...>] [-j <n[-n]>] <output.apkg>
+Usage: {sys.argv[0]} [-FRTGh] [-n <name>] [-t <tags...>] [-j <n[-n]>] <output.apkg>
 
 Generates an Anki deck for Japanese vocabulary study.
 
@@ -27,6 +29,7 @@ first time you generate decks based on this cache, it may be slower, but
 subsequent runs will be faster. You can't configure where the cache is. You
 can't deduplicate it. Suck it up or send a patch.
 
+-F: disable word frequency sorting (RTK order is used instead).
 -T: disable default tags (#common #words). Specify before -t.
 -G: show grammatical terms in English.
 -n <name>: deck name
@@ -38,12 +41,16 @@ for opt, val in opts:
     if opt == "-h":
         print(help_text)
         sys.exit(0)
+    elif opt == "-F":
+        sort_by_freq
     elif opt == "-T":
         tags = []
     elif opt == "-G":
         translate_grammar = True
     elif opt == "-t":
         tags = val.split(",") + tags
+    elif opt == "-n":
+        deck_name = val
     elif opt == "-j":
         levels = val.split("-")
         if len(levels) == 1:
@@ -80,12 +87,6 @@ def jlpt_filter(w):
     wmax = max(int(j[-1]) for j in w["jlpt"])
     return wmin <= jlpt_min <= wmax
 
-words = list()
-for kanji in tqdm(rtk):
-    results = jisho_get(kanji, tags=tags)
-    filtered = [w for w in results["data"] if jlpt_filter(w)]
-    words += filtered
-
 pos_map = {
     "godan verb with ru ending": "る五段",
     "godan verb with mu ending": "む五段",
@@ -103,6 +104,7 @@ pos_map = {
     "adverb": "副詞",
     "suffix": "接尾辞",
     "prefix": "接頭辞",
+    "conjunction": "接続詞",
 }
 
 tags_map = {
@@ -143,13 +145,33 @@ def filter_sense(sense):
     # TODO: Other criteria?
     return True
 
+def jword_sort_key(word):
+    unsorted = 999999999
+    wordfreq_index = unsorted
+    rtk_index = unsorted
+
+    if word in wordfreq:
+        wordfreq_index = wordfreq[word]
+    rtk_index = min(rtk.index(ch) if ch in rtk else unsorted for ch in word)
+
+    if sort_by_freq:
+        return wordfreq_index
+    else:
+        return rtk_index
+
+def word_sort_key(word):
+    jwords = set([
+        w["word"] if "word" in w else w["reading"] for w in word['japanese']
+    ])
+    return min(jword_sort_key(w) for w in jwords)
+
 seen = set()
 def gen_note(word):
     jwords = set([
         w["word"] if "word" in w else w["reading"] for w in word['japanese']
     ])
     # Sort so that RTK kanji words are always shown first
-    jwords = sorted(jwords, key=lambda w: any(c in rtk for c in w))
+    jwords = sorted(jwords, key=jword_sort_key)
     readings = set(w["reading"]
             if "reading" in w else w["word"] for w in word['japanese'])
     senses = word["senses"][:5]
@@ -162,6 +184,15 @@ def gen_note(word):
     ]
     japanese = ", ".join(jwords)
     english = "<ol>" + "".join(f"<li>{w}</li>" for w in ewords) + "</ol>"
+
+    # Force readings if normally written with kana alone
+    include_readings = any(
+            "Usually written using kana alone" in s["tags"] for s in senses)
+    if include_readings:
+        for r in readings:
+            if r not in japanese:
+                japanese = f"{r}, {japanese}"
+
     readings = ", ".join(readings)
     slug = word["slug"]
 
@@ -183,6 +214,14 @@ if not deck_name:
         deck_name += " " + " ".join(tags)
 
 deck = genanki.Deck(random.randrange(1 << 30, 1 << 31), deck_name)
+
+words = list()
+for kanji in tqdm(rtk):
+    results = jisho_get(kanji, tags=tags)
+    filtered = [w for w in results["data"] if jlpt_filter(w)]
+    words += filtered
+
+words = sorted(words, key=word_sort_key)
 
 for word in words:
     note = gen_note(word)
