@@ -71,7 +71,7 @@ if len(args) != 1:
 
 output = args[0]
 
-def filter_word(w):
+def jlpt_filter(w):
     if jlpt_min == -1:
         return True
     if len(w["jlpt"]) == 0:
@@ -83,7 +83,7 @@ def filter_word(w):
 words = list()
 for kanji in tqdm(rtk):
     results = jisho_get(kanji, tags=tags)
-    filtered = [w for w in results["data"] if filter_word(w)]
+    filtered = [w for w in results["data"] if jlpt_filter(w)]
     words += filtered
 
 pos_map = {
