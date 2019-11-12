@@ -49,6 +49,12 @@ https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Japanese
 
 https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Japanese10001-20000
 
+vocabgen
+
+- only use the primary written form of a word as canonical, put the others in a
+  footnote
+- clarify which forms of the word are used more often for which senses
+
 kanjigen
 
 - stroke order via kanjivg
