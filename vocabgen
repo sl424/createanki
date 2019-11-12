@@ -74,6 +74,8 @@ output = args[0]
 def filter_word(w):
     if jlpt_min == -1:
         return True
+    if len(w["jlpt"]) == 0:
+        return False
     wmin = min(int(j[-1]) for j in w["jlpt"])
     wmax = max(int(j[-1]) for j in w["jlpt"])
     return wmin <= jlpt_min <= wmax
@@ -171,9 +173,16 @@ def gen_note(word):
         model=vocab_model,
         fields=[japanese, english, readings, slug])
 
-deck = genanki.Deck(
-        random.randrange(1 << 30, 1 << 31),
-        deck_name or "Japanese " + " ".join(tags))
+if not deck_name:
+    deck_name = "Japanese"
+    if jlpt_min != -1 and jlpt_max != jlpt_min:
+        deck_name += f" JLPT{jlpt_min}-{jlpt_max}"
+    elif jlpt_min != -1:
+        deck_name += f" JLPT{jlpt_min}"
+    if any(tags):
+        deck_name += " " + " ".join(tags)
+
+deck = genanki.Deck(random.randrange(1 << 30, 1 << 31), deck_name)
 
 for word in words:
     note = gen_note(word)
