@@ -1,3 +1,8 @@
+# createanki
+A fork of the drew devault's anki generator
+
+
+
 # ddevlang
 
 Source code for tools I use for learning Japanese, and maybe other languages in
