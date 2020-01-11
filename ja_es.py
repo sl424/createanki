@@ -7,7 +7,7 @@ from pathlib import Path
 
 #os.environ["PATH"] += os.pathsep + r
 
-folder = Path('./')
+folder = Path('./dictionary')
 
 class Word:
 	def __init__(self, kanji, kana, speech, type, rank, spanish, freq, source):
